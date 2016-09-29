@@ -1,8 +1,8 @@
-package se.liu.rtslab.energybox.engines;
+package energybox.engines;
 
-import se.liu.rtslab.energybox.FastModifiableObservableList;
-import se.liu.rtslab.energybox.Packet;
-import se.liu.rtslab.energybox.StatisticsEntry;
+import energybox.FastModifiableObservableList;
+import energybox.Packet;
+import energybox.StatisticsEntry;
 import java.util.ArrayList;
 
 import javafx.collections.FXCollections;
@@ -21,17 +21,20 @@ public abstract class Engine
     protected ObservableList<Packet> packetList;
     
     // RESULTS VARIABLES
-    protected FastModifiableObservableList<XYChart.Data<Double, Integer>> stateSeriesData = new FastModifiableObservableList<>();
-    protected XYChart.Series<Double, Integer> stateSeries = new XYChart.Series<>(stateSeriesData);
-    XYChart.Series<Double, Integer> uplinkPacketSeries = new XYChart.Series<>(new FastModifiableObservableList<XYChart.Data<Double, Integer>>());
-    XYChart.Series<Double, Integer> downlinkPacketSeries = new XYChart.Series<>(new FastModifiableObservableList<XYChart.Data<Double, Integer>>());
-    XYChart.Series<Double, Long> uplinkSeries = new XYChart.Series<>();
-    XYChart.Series<Double, Long> downlinkSeries = new XYChart.Series<>();
+    protected FastModifiableObservableList<Integer> stateSeriesData = new FastModifiableObservableList<>();
+    protected XYChart.Series<Double, Integer> stateSeries = new XYChart.Series(stateSeriesData);
+    XYChart.Series<Long, Integer> uplinkPacketSeries = new XYChart.Series(new FastModifiableObservableList<>());
+    XYChart.Series<Long, Integer> downlinkPacketSeries = new XYChart.Series(new FastModifiableObservableList<>());
+    XYChart.Series<Double, Long> uplinkSeries = new XYChart.Series();
+    XYChart.Series<Double, Long> downlinkSeries = new XYChart.Series();
+    protected ObservableList<PieChart.Data> linkDistrData = 
+            FXCollections.observableArrayList(new ArrayList());
     protected int uplinkPacketCount = 0;
-    protected ObservableList<StatisticsEntry> statisticsList = FXCollections.observableList(new ArrayList<StatisticsEntry>());
-    protected ObservableList<StatisticsEntry> distrStatisticsList = FXCollections.observableList(new ArrayList<StatisticsEntry>());
-    protected Double power = 0.0;
-    
+    protected ObservableList<PieChart.Data> stateTimeData = 
+            FXCollections.observableArrayList(new ArrayList());
+    protected ObservableList<StatisticsEntry> statisticsList = FXCollections.observableList(new ArrayList());
+    protected ObservableList<StatisticsEntry> distrStatisticsList = FXCollections.observableList(new ArrayList());
+    protected Double power = Double.valueOf(0);
     // PACKET SORTING
     public ObservableList<Packet> sortUplinkDownlink(ObservableList<Packet> packetList, String sourceIP)
     {
@@ -48,10 +51,10 @@ public abstract class Engine
     {
         uplinkSeries.getData().clear();
         uplinkSeries.setName("Uplink");
-        Long throughput = 0L;
+        Long throughput = Long.valueOf(0); 
         double currentChunk = chunkSize;
         
-        uplinkSeries.getData().add(new XYChart.Data<>(packetList.get(0).getTime(), 0L));
+        uplinkSeries.getData().add(new XYChart.Data(packetList.get(0).getTime(), Long.valueOf(0)));
         int i = 0;
         while ((currentChunk < packetList.get(packetList.size()-1).getTime()) && (i<packetList.size()))
         {
@@ -64,8 +67,8 @@ public abstract class Engine
                 }
                 else
                 {
-                    uplinkSeries.getData().add(new XYChart.Data<>(currentChunk, throughput));
-                    throughput = 0L;
+                    uplinkSeries.getData().add(new XYChart.Data(currentChunk, throughput)); 
+                    throughput = Long.valueOf(0);
                     currentChunk += chunkSize;
                 }
             }
@@ -74,13 +77,13 @@ public abstract class Engine
                 if (packetList.get(i).getTime() < currentChunk) i++;
                 else 
                 {
-                    uplinkSeries.getData().add(new XYChart.Data<>(currentChunk, throughput));
-                    throughput = 0L;
+                    uplinkSeries.getData().add(new XYChart.Data(currentChunk, throughput));
+                    throughput = Long.valueOf(0);
                     currentChunk += chunkSize;
                 }
             }
         }
-        uplinkSeries.getData().add(new XYChart.Data<>(packetList.get(packetList.size()-1).getTime(), throughput));
+        uplinkSeries.getData().add(new XYChart.Data(packetList.get(packetList.size()-1).getTime(), throughput));
         return uplinkSeries;
     }
     
@@ -89,10 +92,10 @@ public abstract class Engine
     {
         downlinkSeries.getData().clear();
         downlinkSeries.setName("Downlink");
-        Long throughput = 0L;
+        Long throughput = Long.valueOf(0);
         double currentChunk = chunkSize;
         
-        downlinkSeries.getData().add(new XYChart.Data<>(packetList.get(0).getTime(), 0L));
+        downlinkSeries.getData().add(new XYChart.Data(packetList.get(0).getTime(), Long.valueOf(0)));
         int i = 0;       
         while ((currentChunk < packetList.get(packetList.size()-1).getTime()) && (i<packetList.size()))
         {
@@ -105,8 +108,8 @@ public abstract class Engine
                 }
                 else
                 {
-                    downlinkSeries.getData().add(new XYChart.Data<>(currentChunk, throughput));
-                    throughput = 0L;
+                    downlinkSeries.getData().add(new XYChart.Data(currentChunk, throughput)); 
+                    throughput = Long.valueOf(0);
                     currentChunk += chunkSize;
                 }
             }
@@ -115,13 +118,13 @@ public abstract class Engine
                 if (packetList.get(i).getTime() < currentChunk) i++;
                 else 
                 {
-                    downlinkSeries.getData().add(new XYChart.Data<>(currentChunk, throughput));
-                    throughput = 0L;
+                    downlinkSeries.getData().add(new XYChart.Data(currentChunk, throughput));
+                    throughput = Long.valueOf(0);
                     currentChunk += chunkSize;
                 }
             }
         }
-        downlinkSeries.getData().add(new XYChart.Data<>(packetList.get(packetList.size()-1).getTime(), throughput));
+        downlinkSeries.getData().add(new XYChart.Data(packetList.get(packetList.size()-1).getTime(), throughput));
         return downlinkSeries;
     }
     
@@ -135,12 +138,12 @@ public abstract class Engine
     // Implemented in every Engine type seperately.
     public abstract void calculatePower();
     
-    private ArrayList<XYChart.Data<Double, Integer>> uplinkChartData = new ArrayList<>();
-    private ArrayList<XYChart.Data<Double, Integer>> downlinkChartData = new ArrayList<>();
+    private ArrayList<XYChart.Data<Long, Integer>> uplinkChartData = new ArrayList<>();
+    private ArrayList<XYChart.Data<Long, Integer>> downlinkChartData = new ArrayList<>();
 
     public void packetChartEntry(Packet packet)
     {
-        ArrayList<XYChart.Data<Double, Integer>> target;
+        ArrayList<XYChart.Data<Long, Integer>> target;
         if (packet.getUplink()) {
             uplinkPacketCount++;
             target = uplinkChartData;
@@ -150,9 +153,9 @@ public abstract class Engine
         
         double time = packet.getTime();
         
-        target.add(new XYChart.Data<>(time,0));
-        target.add(new XYChart.Data<>(time, packet.getLength()));
-        target.add(new XYChart.Data<>(time,0));
+        target.add(new XYChart.Data(time,0));
+        target.add(new XYChart.Data(time, packet.getLength()));
+        target.add(new XYChart.Data(time,0));
     }
     
     public void updatePacketCharts() {
@@ -163,20 +166,21 @@ public abstract class Engine
     public void drawState(Long time, int state)
     {
         Double tempTime = time.doubleValue()/1000000;
-        stateSeries.getData().add(new XYChart.Data<>(tempTime, state));
+        stateSeries.getData().add(new XYChart.Data(tempTime, state));        
     }
     
     // GETTERS
-    public XYChart.Series<Double, Integer> getUplinkPackets(){ return uplinkPacketSeries; }
-    public XYChart.Series<Double, Integer> getDownlinkPackets(){ return downlinkPacketSeries; }
+    public XYChart.Series<Long, Integer> getUplinkPackets(){ return uplinkPacketSeries; }
+    public XYChart.Series<Long, Integer> getDownlinkPackets(){ return downlinkPacketSeries; }
     public XYChart.Series<Double, Integer> getPower(){ return stateSeries; }
+    public ObservableList<PieChart.Data> getLinkDistroData() { return linkDistrData; }
+    public ObservableList<PieChart.Data> getStateTimeData() { return stateTimeData; }
     public String getSourceIP() {return sourceIP;}
     public ObservableList<Packet> getPacketList() {return packetList; }
     public ObservableList<StatisticsEntry> getStatisticsList() {return statisticsList; }
     public ObservableList<StatisticsEntry> getDistrStatisticsList() {return distrStatisticsList; }
     public Double getPowerValue() { return power; }
-    public int getDownlinkPacketCount() { return packetList.size()-uplinkPacketCount; }
-    public int getUplinkPacketCount() { return uplinkPacketCount; }
     // Name: "3G" or "Wifi"
     abstract public String getName();
+
 }

@@ -1,13 +1,14 @@
-package se.liu.rtslab.energybox.engines;
+package energybox.engines;
 
-import se.liu.rtslab.energybox.Packet;
-import se.liu.rtslab.energybox.StatisticsEntry;
-import se.liu.rtslab.energybox.properties.device.PropertiesDeviceWifi;
-import se.liu.rtslab.energybox.properties.network.PropertiesWifi;
+import energybox.Packet;
+import energybox.StatisticsEntry;
+import energybox.properties.device.PropertiesDeviceWifi;
+import energybox.properties.network.PropertiesWifi;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import javafx.collections.ObservableList;
+import javafx.scene.chart.PieChart;
 import javafx.scene.chart.XYChart;
 
 /**
@@ -18,20 +19,14 @@ public class EngineWifi extends Engine
 { 
     PropertiesWifi networkProperties; 
     PropertiesDeviceWifi deviceProperties;
-
-    // Pie chart data
-    private double timeInCAM;
-    private double timeInCAMH;
-    private double timeInPSM;
-
-    enum State
+    enum State 
     { 
         PSM(0), CAM(2), CAMH(3);
         private final int value;
         private State(int value){this.value = value;}
         public int getValue() { return this.value; }
     }
-    XYChart.Series<Double, Integer> camSeries = new XYChart.Series<>();
+    XYChart.Series<Long, Integer> camSeries = new XYChart.Series();
     
     public EngineWifi(ObservableList<Packet> packetList,
             String sourceIP,
@@ -229,17 +224,19 @@ public class EngineWifi extends Engine
                             else if (stateSeries.getData().get(i-1).getYValue() == State.CAM.getValue())
                             {
                                 stateSeries.getData().add(i,
-                                        new XYChart.Data<>(
+                                        new XYChart.Data(
                                                 uplinkSeries.getData().get(chunk-1).getXValue(), 
                                                 State.CAMH.getValue()));
                                 stateSeries.getData().add(i,
-                                        pointCam(uplinkSeries.getData().get(chunk-1).getXValue()));
+                                        new XYChart.Data(
+                                                uplinkSeries.getData().get(chunk-1).getXValue(), 
+                                                State.CAM.getValue()));
                             }
                             // Add new point after current one
                             else
                             {
                                 stateSeries.getData().add(i+1, 
-                                        new XYChart.Data<>(
+                                        new XYChart.Data(
                                                 stateSeries.getData().get(i).getXValue(), 
                                                 State.CAMH.getValue()));
                             }
@@ -265,11 +262,13 @@ public class EngineWifi extends Engine
                             // more than one chunk after the previous CAMH chunk,
                             // find the last CAMH chunk's end time
                             stateSeries.getData().add(i,
-                                    pointCam(uplinkSeries.getData().get(lastCAMH).getXValue()+ 0.001));
+                                    new XYChart.Data(
+                                            uplinkSeries.getData().get(lastCAMH).getXValue()+Double.valueOf(0.001), 
+                                            State.CAM.getValue()));
 
                             stateSeries.getData().add(i,
-                                    new XYChart.Data<>(
-                                            uplinkSeries.getData().get(lastCAMH).getXValue()+ 0.001,
+                                    new XYChart.Data(
+                                            uplinkSeries.getData().get(lastCAMH).getXValue()+Double.valueOf(0.001), 
                                             State.CAMH.getValue()));
                             i++;
                         }
@@ -292,17 +291,18 @@ public class EngineWifi extends Engine
             drawState(previousTime + (long)networkProperties.getCAM_PSM_INACTIVITY_TIME(), state.getValue());
             //drawState(Long.valueOf(270046000L), state.getValue());
         }
-        distrStatisticsList.add(new StatisticsEntry("Nr of UL packets", getUplinkPacketCount()));
-        distrStatisticsList.add(new StatisticsEntry("Nr of DL packets", getDownlinkPacketCount()));
+        linkDistrData.add(new PieChart.Data("Uplink", uplinkPacketCount));
+        linkDistrData.add(new PieChart.Data("Downlink", packetList.size()-uplinkPacketCount));
+        distrStatisticsList.add(new StatisticsEntry("Nr of UL packets",uplinkPacketCount));
+        distrStatisticsList.add(new StatisticsEntry("Nr of DL packets",packetList.size()-uplinkPacketCount));
         return stateSeries;
     }
     
     @Override
     public void calculatePower()
     {
-        timeInPSM = 0.0;
-        timeInCAM = 0.0;
-        timeInCAMH = 0.0;
+        //Double power = Double.valueOf(0);
+        int timeInPSM = 0, timeInCAM = 0, timeInCAMH = 0;
         for (int i = 1; i < stateSeries.getData().size(); i++)
         {
             if (true)//(stateSeries.getData().get(i).getXValue() <= Double.valueOf(310.97))
@@ -338,6 +338,8 @@ public class EngineWifi extends Engine
         }
         // Total power used rounded down to four decimal places
         statisticsList.add(new StatisticsEntry("Total Power Used",((double) Math.round(power * 10000) / 10000)));
+        stateTimeData.add(new PieChart.Data("DCH", timeInPSM));
+        stateTimeData.add(new PieChart.Data("IDLE", timeInCAM));
     }
 
     @Override
@@ -371,31 +373,22 @@ public class EngineWifi extends Engine
     private void psmToCam(Double time)
     {
         time = time / 1000000;
-        camSeries.getData().add(pointZero(time));
-        camSeries.getData().add(pointCam(time));
+        camSeries.getData().add(new XYChart.Data(time, 0));
+        camSeries.getData().add(new XYChart.Data(time, State.CAM.getValue()));
     }
-
-    private XYChart.Data<Double, Integer> pointCam(Double time) {
-        return new XYChart.Data<Double, Integer>(time, State.CAM.getValue());
-    }
-
-    private XYChart.Data<Double, Integer> pointZero(Double time) {
-        return new XYChart.Data<Double, Integer>(time, 0);
-    }
-
+    
     private void camToPsm(Double time)
     {
         time = time / 1000000;
-        camSeries.getData().add(pointCam(time));
-        camSeries.getData().add(pointZero(time));
+        camSeries.getData().add(new XYChart.Data(time, State.CAM.getValue()));
+        camSeries.getData().add(new XYChart.Data(time, 0));
     }
     
     // GETTERS
-    public XYChart.Series<Double, Integer> getCAM(){ return camSeries; }
-    public double getTimeInCAM() { return timeInCAM; }
-    public double getTimeInCAMH() { return timeInCAMH; }
-    public double getTimeInPSM() { return timeInPSM; }
-
+    public XYChart.Series<Long, Integer> getCAM(){ return camSeries; }
+    
+    
+    
     private void testThroughput()
     {
         File file = new File("D:\\testUL.csv");

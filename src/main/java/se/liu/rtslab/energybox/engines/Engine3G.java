@@ -1,10 +1,11 @@
-package se.liu.rtslab.energybox.engines;
+package energybox.engines;
 
-import se.liu.rtslab.energybox.Packet;
-import se.liu.rtslab.energybox.StatisticsEntry;
-import se.liu.rtslab.energybox.properties.device.PropertiesDevice3G;
-import se.liu.rtslab.energybox.properties.network.Properties3G;
+import energybox.Packet;
+import energybox.StatisticsEntry;
+import energybox.properties.device.PropertiesDevice3G;
+import energybox.properties.network.Properties3G;
 import javafx.collections.ObservableList;
+import javafx.scene.chart.PieChart;
 import javafx.scene.chart.XYChart;
 /**
  * @author Rihards Polis
@@ -19,19 +20,14 @@ public class Engine3G extends Engine
         private State(int value){this.value = value;}
         public int getValue() { return this.value; }
     }
-
-    // Pie chart data
-    private double timeInFACH;
-    private double timeInIDLE;
-    private double timeInDCH;
     
     // VARIABLES TAKEN FROM THE CONSTRUCTOR
     Properties3G networkProperties; 
     PropertiesDevice3G deviceProperties;
     
     // CHART VARIABLES
-    XYChart.Series<Double, Integer> fachSeries = new XYChart.Series<>();
-    XYChart.Series<Double, Integer> dchSeries = new XYChart.Series<>();
+    XYChart.Series<Long, Integer> fachSeries = new XYChart.Series();
+    XYChart.Series<Long, Integer> dchSeries = new XYChart.Series();
     
     // MAIN CONSTRUCTOR
     public Engine3G(ObservableList<Packet> packetList,
@@ -288,32 +284,39 @@ public class Engine3G extends Engine
 
         stateSeriesData.afterChanges();
 
-        distrStatisticsList.add(new StatisticsEntry("Nr of UL packets", getUplinkPacketCount()));
-        distrStatisticsList.add(new StatisticsEntry("Nr of DL packets", getDownlinkPacketCount()));
+        linkDistrData.add(new PieChart.Data("Uplink", uplinkPacketCount));
+        linkDistrData.add(new PieChart.Data("Downlink", packetList.size()-uplinkPacketCount));
+        distrStatisticsList.add(new StatisticsEntry("Nr of UL packets",uplinkPacketCount));
+        distrStatisticsList.add(new StatisticsEntry("Nr of DL packets",packetList.size()-uplinkPacketCount));
         return stateSeries;
     }
-
+    
     @Override
-    public void calculatePower() {
-        timeInIDLE = 0.0;
-        timeInFACH = 0.0;
-        timeInDCH = 0.0;
-        for (int i = 1; i < stateSeries.getData().size(); i++) {
-            double timeDifference = (stateSeries.getData().get(i).getXValue() - stateSeries.getData().get(i - 1).getXValue());
-            switch (stateSeries.getData().get(i - 1).getYValue()) {
-                case 0: {
+    public void calculatePower()
+    {
+        //Double power = Double.valueOf(0);
+        int timeInIDLE = 0, timeInFACH = 0, timeInDCH = 0;
+        for (int i = 1; i < stateSeries.getData().size(); i++)
+        {
+            double timeDifference = (stateSeries.getData().get(i).getXValue() - stateSeries.getData().get(i-1).getXValue());
+            switch(stateSeries.getData().get(i-1).getYValue())
+            {
+                case 0:
+                {
                     power += timeDifference * deviceProperties.getPOWER_IN_IDLE();
                     timeInIDLE += timeDifference;
                 }
                 break;
-
-                case 1: {
+                    
+                case 1:
+                {
                     power += timeDifference * deviceProperties.getPOWER_IN_FACH();
                     timeInFACH += timeDifference;
                 }
                 break;
-
-                case 3: {
+                    
+                case 3:
+                {
                     power += timeDifference * deviceProperties.getPOWER_IN_DCH();
                     timeInDCH += timeDifference;
                 }
@@ -321,7 +324,10 @@ public class Engine3G extends Engine
             }
         }
         // Total power used rounded down to four decimal places
-        statisticsList.add(new StatisticsEntry("Total Power Used", ((double) Math.round(power * 10000) / 10000)));
+        statisticsList.add(new StatisticsEntry("Total Power Used",((double) Math.round(power * 10000) / 10000)));
+        stateTimeData.add(new PieChart.Data("FACH", timeInFACH));
+        stateTimeData.add(new PieChart.Data("DCH", timeInDCH));
+        stateTimeData.add(new PieChart.Data("IDLE", timeInIDLE));
     }
 
     @Override
@@ -333,67 +339,50 @@ public class Engine3G extends Engine
     private void dchToFach(Double time)
     {
         time = time / 1000000;
-        dchSeries.getData().add(pointDch(time));
-        dchSeries.getData().add(pointZero(time));
+        dchSeries.getData().add(new XYChart.Data(time, State.DCH.getValue()));
+        dchSeries.getData().add(new XYChart.Data(time, 0));
         
-        fachSeries.getData().add(pointZero(time));
-        fachSeries.getData().add(pointFach(time));
+        fachSeries.getData().add(new XYChart.Data(time, 0));
+        fachSeries.getData().add(new XYChart.Data(time, State.FACH.getValue()));
     }
-
+    
     private void fachToIdle(Double time)
     {
         time = time / 1000000;
-        fachSeries.getData().add(pointFach(time));
-        fachSeries.getData().add(pointZero(time));
+        fachSeries.getData().add(new XYChart.Data(time, State.FACH.getValue()));
+        fachSeries.getData().add(new XYChart.Data(time, 0));
     }
     
     private void idleToFach(Double time)
     {
         time = time / 1000000;
-        fachSeries.getData().add(pointZero(time));
-        fachSeries.getData().add(pointFach(time));
+        fachSeries.getData().add(new XYChart.Data(time, 0));
+        fachSeries.getData().add(new XYChart.Data(time, State.FACH.getValue()));
     }
     
     private void idleToDch(Double time)
     {
         time = time / 1000000;
-        dchSeries.getData().add(pointZero(time));
-        dchSeries.getData().add(pointDch(time));
+        dchSeries.getData().add(new XYChart.Data(time, 0));
+        dchSeries.getData().add(new XYChart.Data(time, State.DCH.getValue()));
     }
     
     private void fachToDch(Double time)
     {
         time = time / 1000000;
-        fachSeries.getData().add(pointFach(time));
-        fachSeries.getData().add(pointZero(time));
+        fachSeries.getData().add(new XYChart.Data(time, State.FACH.getValue()));
+        fachSeries.getData().add(new XYChart.Data(time, 0));
         
-        dchSeries.getData().add(pointZero(time));
-        dchSeries.getData().add(pointDch(time));
+        dchSeries.getData().add(new XYChart.Data(time, 0));
+        dchSeries.getData().add(new XYChart.Data(time, State.DCH.getValue()));
     }
-
+    
     // Formula for calculating buffer empty time depending on buffer occupancy
     // (Downlink is modeled with a constant occupancy - the value in networkProperties)
     public long timeToEmptyUplink(int buffer) { return (long)networkProperties.getUPLINK_BUFFER_EMPTY_TIME() * buffer + 10; }
     
     
     // GETTERS
-    public XYChart.Series<Double, Integer> getFACH(){ return fachSeries; }
-    public XYChart.Series<Double, Integer> getDCH(){ return dchSeries; }
-
-    public double getTimeInFACH() { return timeInFACH; }
-    public double getTimeInDCH() { return timeInDCH; }
-    public double getTimeInIDLE() { return timeInIDLE; }
-
-
-    private XYChart.Data<Double, Integer> pointDch(Double time) {
-        return new XYChart.Data<Double, Integer>(time, State.DCH.getValue());
-    }
-
-    private XYChart.Data<Double, Integer> pointFach(Double time) {
-        return new XYChart.Data<Double, Integer>(time, State.FACH.getValue());
-    }
-
-    private XYChart.Data<Double, Integer> pointZero(Double time) {
-        return new XYChart.Data<Double, Integer>(time, 0);
-    }
+    public XYChart.Series<Long, Integer> getFACH(){ return fachSeries; }
+    public XYChart.Series<Long, Integer> getDCH(){ return dchSeries; }
 }
