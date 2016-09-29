@@ -1,6 +1,6 @@
 package energybox;
 
-import energybox.engines.EngineWifi;
+import energybox.engines.EngineLTE;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -17,21 +17,21 @@ import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.PieChart;
 import javafx.scene.chart.StackedAreaChart;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.Dialogs;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import javax.swing.JOptionPane;
-
 /**
- * @author Rihards Polis
+ * @author Gunnar Berg
  * Linkoping University
  */
-public class ResultsFormWifiController implements Initializable
-{XYChart.Series<Double, Integer> states;
-    EngineWifi engine = null;
+public class ResultsFormLTEController implements Initializable
+{
+    XYChart.Series<Double, Integer> states;
+    EngineLTE engine = null;
     
     @FXML
     private LineChart<Long, Integer> packetChart;
@@ -89,10 +89,9 @@ public class ResultsFormWifiController implements Initializable
     @Override
     public void initialize(URL url, ResourceBundle rb){}
     
-    void initData(EngineWifi engine)
+    void initData(EngineLTE engine)
     {
-        this.engine = engine;
-        states = engine.getPower();
+        this.engine = engine; 
 
         axisList.add(throughputXAxis);
         axisList.add(packetXAxis);
@@ -104,16 +103,21 @@ public class ResultsFormWifiController implements Initializable
         descriptionField.setText(engine.getSourceIP());
         //engine.modelStates();
         //engine.calculatePower();
+        states = engine.getPower();
         stateChart.getXAxis().setLabel("Time(s)");
-        stateChart.getYAxis().setLabel("States");
-        stateChart.getData().add(new XYChart.Series("CAM", engine.getCAM().getData()));
+        stateChart.getYAxis().setLabel("RRC States");
+        stateChart.getData().add(new XYChart.Series("LONGDRX", engine.getLONGDRX().getData()));
+        stateChart.getData().add(new XYChart.Series("SHORTDRX", engine.getSHORTDRX().getData()));
+        stateChart.getData().add(new XYChart.Series("ACTIVE", engine.getACTIVE().getData()));
         
         stateChart2.getXAxis().setLabel("Time(s)");
-        stateChart2.getYAxis().setLabel("States");
-        stateChart2.getData().add(new XYChart.Series("CAM", engine.getCAM().getData()));
+        stateChart2.getYAxis().setLabel("RRC States");
+        stateChart2.getData().add(new XYChart.Series("LONGDRX", engine.getLONGDRX().getData()));
+        stateChart2.getData().add(new XYChart.Series("SHORTDRX", engine.getSHORTDRX().getData()));
+        stateChart2.getData().add(new XYChart.Series("ACTIVE", engine.getACTIVE().getData()));
         
         powerChart.getXAxis().setLabel("Time(s)");
-        powerChart.getYAxis().setLabel("Power(J)");
+        powerChart.getYAxis().setLabel("Power(W)");
         powerChart.getData().add(engine.getPower());
         
         linkDistroPieChart.getData().addAll(engine.getLinkDistroData());
@@ -125,7 +129,7 @@ public class ResultsFormWifiController implements Initializable
                 engine.getPacketList().get(engine.getPacketList().size()-1).getTime()/50));
         throughputChart.getData().add(engine.getDownlinkThroughput(
                 engine.getPacketList().get(engine.getPacketList().size()-1).getTime()/50));
-        /*
+        
         packetChart.getXAxis().setLabel("Time(s)");
         packetChart.getYAxis().setLabel("Size(bytes)");
         packetChart.getData().add(new XYChart.Series("Uplink", engine.getUplinkPackets().getData()));
@@ -140,7 +144,7 @@ public class ResultsFormWifiController implements Initializable
         packetChart3.getYAxis().setLabel("Size(bytes)");
         packetChart3.getData().add(new XYChart.Series("Uplink", engine.getUplinkPackets().getData()));
         packetChart3.getData().add(new XYChart.Series("Downlink", engine.getDownlinkPackets().getData()));
-        */
+        
         packetTable.getItems().setAll(engine.getPacketList());
         statsTable.getItems().setAll(engine.getStatisticsList());
         linkDistroTable.getItems().setAll(engine.getDistrStatisticsList());
@@ -188,7 +192,6 @@ public class ResultsFormWifiController implements Initializable
             {
                 double newFromTime = Double.parseDouble(fromTimeField.getText());
                 NumberAxis something = new NumberAxis();
-                //something.setRange();
                 for (NumberAxis axis : axisList)
                 {
                     axis.setAutoRanging(false);
@@ -198,8 +201,7 @@ public class ResultsFormWifiController implements Initializable
             }
             catch (NumberFormatException e)
             {
-                // TODO: Replace with the ControlFX third party error dialogues
-                JOptionPane.showMessageDialog(null, "Not a number!\nPlease input a number with decimal seperator '.'");
+                Dialogs.showErrorDialog(null, "Not a number! Please input a number with decimal seperator '.'");
             }
         }
         else
@@ -230,8 +232,7 @@ public class ResultsFormWifiController implements Initializable
             }
             catch (NumberFormatException e)
             {
-                // TODO: Replace with the ControlFX third party error dialogues
-                JOptionPane.showMessageDialog(null, "Not a number!\nPlease input a number with decimal seperator '.'");
+                Dialogs.showErrorDialog(null, "Not a number! Please input a number with decimal seperator '.'");
             }
         }
         else
@@ -261,8 +262,7 @@ public class ResultsFormWifiController implements Initializable
             }
             catch (NumberFormatException e)
             {
-                // TODO: Replace with the ControlFX third party error dialogues
-                JOptionPane.showMessageDialog(null, "Not a number!\nPlease input a number with decimal seperator '.'");
+                Dialogs.showErrorDialog(null, "Not a number! Please input a number with decimal seperator '.'");
             }
         }
         else

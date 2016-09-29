@@ -1,14 +1,17 @@
-package se.liu.rtslab.energybox;
+package energybox;
 
-import se.liu.rtslab.energybox.engines.Engine;
-import se.liu.rtslab.energybox.engines.EngineWifi;
-import se.liu.rtslab.energybox.engines.Engine3G;
-import se.liu.rtslab.energybox.properties.device.Device;
-import se.liu.rtslab.energybox.properties.device.PropertiesDevice3G;
-import se.liu.rtslab.energybox.properties.device.PropertiesDeviceWifi;
-import se.liu.rtslab.energybox.properties.network.Network;
-import se.liu.rtslab.energybox.properties.network.Properties3G;
-import se.liu.rtslab.energybox.properties.network.PropertiesWifi;
+import energybox.engines.Engine;
+import energybox.engines.EngineWifi;
+import energybox.engines.Engine3G;
+import energybox.engines.EngineLTE;
+import energybox.properties.device.Device;
+import energybox.properties.device.PropertiesDevice3G;
+import energybox.properties.device.PropertiesDeviceWifi;
+import energybox.properties.device.PropertiesDeviceLTE;
+import energybox.properties.network.Network;
+import energybox.properties.network.Properties3G;
+import energybox.properties.network.PropertiesWifi;
+import energybox.properties.network.PropertiesLTE;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileWriter;
@@ -25,6 +28,7 @@ import javafx.scene.chart.XYChart;
  */
 public class ConsoleBox
 {
+    private final String networkPath, devicePath;
     private final Engine engine;
     // populated within printResults() to be printed by outputToFile()
     private XYChart.Series<Double, Integer> printStates;
@@ -32,72 +36,32 @@ public class ConsoleBox
     private String sourceIP = "";
     private ProcessTrace trace;
 
-    /**
-     * Initialize using paths to config files, e.g. "/home/username/EnergyBox/config/3g_teliasonera.config"
-     *
-     * This constructor is used when calling EnergyBox from the shell.
-     */
     public ConsoleBox(ProcessTrace trace, String tracePath, String networkPath, String devicePath) {
         this.trace = trace;
         this.sourceIP = trace.getSourceIP();
 
+        this.networkPath = networkPath;
+        this.devicePath = devicePath;
+
+        ObservableList<Packet> packetList = trace.getPacketList();
+
+        Properties networkConfig;
         Network networkProperties = null;
         Device deviceProperties = null;
         try {
-            networkProperties = getNetworkProperties(pathToProperties(networkPath));
+            networkConfig = pathToProperties(networkPath);
+            networkProperties = getNetworkProperties(networkConfig);
             deviceProperties = buildDeviceProperties(pathToProperties(devicePath));
         } catch (IOException e) {
             e.printStackTrace();
         }
+        engine = buildEngine(packetList, deviceProperties, networkProperties);
 
-        engine = tryBuildEngine(trace.getPacketList(), deviceProperties, networkProperties);
         engine.modelStates();
         engine.calculatePower();
         printStates = engine.getPower(); // so that the states could be accesed for outputToFile
     }
-
-    /**
-     * Initialize using name of config files, e.g. "3g_teliasonera.config".
-     *
-     * This constructor is used when using the EnergyBox library packaged as a .jar file.
-     */
-    public ConsoleBox(ProcessTrace trace, String networkConfig, String deviceConfig) {
-        Properties networkProperties = null;
-        try {
-            InputStream networkStream = ClassLoader.getSystemResourceAsStream(networkConfig);
-            networkProperties = streamToProperties(networkStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        Properties deviceProperties = null;
-        try {
-            InputStream deviceStream = ClassLoader.getSystemResourceAsStream(deviceConfig);
-            deviceProperties = streamToProperties(deviceStream);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        engine = tryBuildEngine(trace.getPacketList(), buildDeviceProperties(deviceProperties), getNetworkProperties(networkProperties));
-        engine.modelStates();
-        engine.calculatePower();
-        printStates = engine.getPower(); // so that the states could be accesed for outputToFile
-    }
-
-    // Build engine. If pcap if empty, bail out by exiting application and printing 0.0 Joules
-    // This ensures that energy can always be grepped from stdout.
-    private Engine tryBuildEngine(ObservableList<Packet> tracePackets, Device device, Network network) {
-        try {
-            return buildEngine(tracePackets, device, network);
-        } catch (IllegalArgumentException e) {
-            if (tracePackets.size() == 0) {
-                System.out.println("Total power in Joules: 0.0");
-                System.exit(0);
-            }
-            throw e;
-        }
-    }
-
+    
     public void printResults()
     {
         power = engine.getPowerValue();
@@ -119,6 +83,8 @@ public class ConsoleBox
         {
             case "3G": return new Properties3G(networkConfig);
             case "Wifi": return new PropertiesWifi(networkConfig);
+            case "LTE": return new PropertiesLTE(networkConfig);
+            case "LTE-tele2": return new PropertiesLTE(networkConfig);    
             default: throw new IllegalArgumentException("Could not determine NETWORK type. Check network config.");
         }
     }
@@ -126,16 +92,13 @@ public class ConsoleBox
     private Engine buildEngine(ObservableList<Packet> packetList,
                              Device deviceProperties,
                              Network networkProperties) {
-        // Engines do not handle empty pcaps gracefully, so fail fast if one is encountered
-        if (packetList.size() == 0) {
-            throw new IllegalArgumentException("Packet trace file is empty.");
-        }
-
         // CHOOSING THE ENGINE
         if (networkProperties instanceof Properties3G) {
             return new Engine3G(packetList, sourceIP, ((Properties3G) networkProperties), ((PropertiesDevice3G) deviceProperties));
         } else if (networkProperties instanceof PropertiesWifi) {
             return new EngineWifi(packetList, sourceIP, ((PropertiesWifi) networkProperties), ((PropertiesDeviceWifi) deviceProperties));
+        } else if (networkProperties instanceof PropertiesLTE) {
+            return new EngineLTE(packetList, sourceIP, ((PropertiesLTE) networkProperties), ((PropertiesDeviceLTE) deviceProperties));
         } else {
             throw new IllegalArgumentException("Could not determine ENGINE type. Check network config.");
         }
@@ -146,48 +109,36 @@ public class ConsoleBox
         {
             case "Device3G": return new PropertiesDevice3G(deviceConfig);
             case "DeviceWifi": return new PropertiesDeviceWifi(deviceConfig);
+            case "DeviceLTE": return new PropertiesDeviceLTE(deviceConfig);    
             default: throw new IllegalArgumentException("Could not determine DEVICE type. Check device config.");
         }
     }
 
     public Properties pathToProperties(String path) throws IOException
     {
-        // try path...
-        File file = new File(path);
-        if (file.exists())
-        {
-            InputStream in = new FileInputStream(file);
-            return streamToProperties(in);
-        }
-
-        // ...then try jar dir...
-        String jarLocation = OSTools.getJarLocation();
-        StringBuilder propertyPath = new StringBuilder();
-        propertyPath.append(new File(jarLocation).getParent());
-        propertyPath.append(File.separator);
-        propertyPath.append(path);
-        file = new File(propertyPath.toString());
-        if (file.exists())
-        {
-            InputStream in = new FileInputStream(file);
-            return streamToProperties(in);
-        }
-
-        // ...then try bundled resources...
-        InputStream stream = ClassLoader.getSystemResourceAsStream(path);
-        if (stream != null) {
-            return streamToProperties(stream);
-        }
-
-        // ...finally: resource cannot be found! s
-        throw new IllegalArgumentException("Could not parse file configuration file: " + path);
-    }
-
-    public Properties streamToProperties(InputStream in) throws IOException
-    {
         Properties properties = new Properties();
-        properties.load(in);
-        return properties;
+        if (new File(path).exists())
+        {
+            File f = new File(path);
+            InputStream in = new FileInputStream (f);
+            properties.load(in);
+            return properties;
+        }
+        else
+        {
+            String location = OSTools.getJarLocation();
+            if (new File(location).exists())
+            {
+                StringBuilder relativePath = new StringBuilder();
+                relativePath.append(new File(location).getParent());
+                relativePath.append(File.separator);
+                relativePath.append(path);
+                File f = new File(relativePath.toString());
+                InputStream in = new FileInputStream (f);
+                properties.load(in);
+            }
+            return properties;
+        }
     }
     
     public void outputToFile(String path)

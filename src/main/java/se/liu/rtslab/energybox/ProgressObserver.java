@@ -1,4 +1,4 @@
-package se.liu.rtslab.energybox;
+package energybox;
 
 /**
  * @author Jens Green Olander

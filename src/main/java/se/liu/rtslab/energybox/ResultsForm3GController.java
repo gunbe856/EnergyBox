@@ -1,8 +1,6 @@
-package se.liu.rtslab.energybox;
+package energybox;
 
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import se.liu.rtslab.energybox.engines.Engine3G;
+import energybox.engines.Engine3G;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -19,13 +17,13 @@ import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.PieChart;
 import javafx.scene.chart.StackedAreaChart;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.Dialogs;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-
 /**
  * @author Rihards Polis
  * Linkoping University
@@ -119,20 +117,10 @@ public class ResultsForm3GController implements Initializable
         powerChart.getXAxis().setLabel("Time(s)");
         powerChart.getYAxis().setLabel("Power(W)");
         powerChart.getData().add(engine.getPower());
-
-        ObservableList<PieChart.Data> linkDistroPieData = FXCollections.observableArrayList(
-                new PieChart.Data("Uplink", engine.getUplinkPacketCount()),
-                new PieChart.Data("Downlink", engine.getDownlinkPacketCount())
-        );
-        linkDistroPieChart.getData().addAll(linkDistroPieData);
-
-        ObservableList<PieChart.Data> stateTimePieData = FXCollections.observableArrayList(
-                new PieChart.Data("FACH", engine.getTimeInFACH()),
-                new PieChart.Data("DCH", engine.getTimeInDCH()),
-                new PieChart.Data("IDLE", engine.getTimeInIDLE())
-        );
-        stateTimePieChart.getData().addAll(stateTimePieData);
-
+        
+        linkDistroPieChart.getData().addAll(engine.getLinkDistroData());
+        stateTimePieChart.getData().addAll(engine.getStateTimeData());
+        
         throughputChart.getXAxis().setLabel("Time(s)");
         throughputChart.getYAxis().setLabel("Bytes/s");
         throughputChart.getData().add(engine.getUplinkThroughput(
@@ -184,7 +172,7 @@ public class ResultsForm3GController implements Initializable
             {
                 writer.append(states.getData().get(i).getYValue().toString());
                 writer.append(",");
-                writer.append(states.getData().get(i).getXValue().toString());
+                writer.append(Double.valueOf(states.getData().get(i).getXValue().doubleValue()).toString());
                 writer.append("\n");
             }
             writer.flush();
@@ -211,7 +199,7 @@ public class ResultsForm3GController implements Initializable
             }
             catch (NumberFormatException e)
             {
-                OSTools.showNumberErrorDialog();
+                Dialogs.showErrorDialog(null, "Not a number! Please input a number with decimal seperator '.'");
             }
         }
         else
@@ -242,12 +230,12 @@ public class ResultsForm3GController implements Initializable
             }
             catch (NumberFormatException e)
             {
-                OSTools.showNumberErrorDialog();
+                Dialogs.showErrorDialog(null, "Not a number! Please input a number with decimal seperator '.'");
             }
         }
         else
         {
-            double newToTime = engine.getPacketList().get(engine.getPacketList().size() - 1).getTime();
+            double newToTime = Double.valueOf(engine.getPacketList().get(engine.getPacketList().size()-1).getTime());
             for (NumberAxis axis : axisList)
             {
                 axis.setAutoRanging(false);
@@ -261,23 +249,26 @@ public class ResultsForm3GController implements Initializable
     @FXML
     private void chunkSizeAction(ActionEvent event)
     {
-        long newChunkValue = 0;
-        try
+        if (!chuckSizeField.getText().equals(""))
         {
-            if (!chuckSizeField.getText().equals(""))
+            try
             {
-                newChunkValue = Long.parseLong(chuckSizeField.getText());
+                long newChunkValue = (long)(Double.parseDouble(chuckSizeField.getText()));
+                throughputChart.getData().clear();
+                throughputChart.getData().add(engine.getUplinkThroughput(newChunkValue));
+                throughputChart.getData().add(engine.getDownlinkThroughput(newChunkValue));
             }
-            else
+            catch (NumberFormatException e)
             {
-                newChunkValue = engine.getPacketList().get(engine.getPacketList().size()-1).getTimeInMicros()/50;
+                Dialogs.showErrorDialog(null, "Not a number! Please input a number with decimal seperator '.'");
             }
-            engine.getUplinkThroughput(newChunkValue);
-            engine.getDownlinkThroughput(newChunkValue);
         }
-        catch (NumberFormatException e)
+        else
         {
-            OSTools.showNumberErrorDialog();
+            long newChunkValue = engine.getPacketList().get(engine.getPacketList().size()-1).getTimeInMicros()/50;
+            throughputChart.getData().clear();
+            throughputChart.getData().add(engine.getUplinkThroughput(newChunkValue));
+            throughputChart.getData().add(engine.getDownlinkThroughput(newChunkValue));
         }
     }
 }

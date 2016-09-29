@@ -1,4 +1,4 @@
-package se.liu.rtslab.energybox;
+package energybox;
 
 import java.io.File;
 import java.io.IOException;
@@ -6,8 +6,7 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.net.URLDecoder;
 import javax.swing.JOptionPane;
-
-import javafx.scene.control.Alert;
+import org.controlsfx.dialog.Dialogs;
 
 /**
  * @author Rihards Polis
@@ -20,13 +19,9 @@ public class OSTools
 {
     private static String OS = System.getProperty("os.name").toLowerCase();
 
-    public static String getOS(){
-        return OS;
-    }
-    //
-    public static void checkOS()
+    public static String getOS() 
     {
-        if (isWindows())
+        if (isWindows()) 
             OS = "Windows";
         else if (isMac()) 
             OS = "Mac";
@@ -36,6 +31,7 @@ public class OSTools
             OS = "Solaris";
         else 
             OS = "error";
+        return OS;
     }
     public static boolean isWindows() { return (OS.indexOf("win") >= 0); }
     public static boolean isMac() { return (OS.indexOf("mac") >= 0); }
@@ -78,19 +74,16 @@ public class OSTools
     {
         try
         {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Error");
-            alert.setHeaderText(title);
-            alert.setContentText(message);
-            alert.showAndWait();
+            Dialogs.create()
+                .owner(null)
+                .title("Error")
+                .masthead(title)
+                .message( message)
+                .showError();
         }
         catch(Exception ex)
         {
             JOptionPane.showMessageDialog(null, message);
         }
-    }
-
-    public static void showNumberErrorDialog() {
-        showErrorDialog("Not a number", "Please input a number with decimal seperator '.'");
     }
 }

@@ -1,4 +1,4 @@
-package se.liu.rtslab.energybox;
+package energybox;
 
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;

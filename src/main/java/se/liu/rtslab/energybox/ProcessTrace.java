@@ -1,8 +1,10 @@
-package se.liu.rtslab.energybox;
+package energybox;
 
+import javafx.application.Platform;
 import javafx.collections.ObservableList;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 
 public interface ProcessTrace extends Runnable {
@@ -25,19 +27,4 @@ public interface ProcessTrace extends Runnable {
     boolean hasErrors();
 
     void setIp(String ip);
-
-    /**
-     * Convenience factory class for creating an instance of appropriate class, according to the host OS.
-     */
-    class Factory {
-        public static ProcessTrace build(String tracePath, UpdatesController controllerUpdater, String OS) {
-            if (OS=="Windows") {
-                return new ProcessTraceLibpcap(tracePath, controllerUpdater);
-            }
-            else {
-                return new ProcessTraceTshark(tracePath, controllerUpdater);
-            }
-        }
-
-    }
 }

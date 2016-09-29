@@ -1,4 +1,8 @@
-package se.liu.rtslab.energybox;
+package energybox;
+
+import energybox.engines.*;
+import energybox.properties.device.*;
+import energybox.properties.network.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -37,15 +41,6 @@ import org.apache.commons.exec.PumpStreamHandler;
 import org.apache.commons.exec.environment.EnvironmentUtils;
 
 import org.jnetpcap.winpcap.WinPcap;
-import se.liu.rtslab.energybox.engines.Engine3G;
-import se.liu.rtslab.energybox.engines.EngineWifi;
-import se.liu.rtslab.energybox.properties.device.Device;
-import se.liu.rtslab.energybox.properties.device.PropertiesDevice3G;
-import se.liu.rtslab.energybox.properties.device.PropertiesDeviceWifi;
-import se.liu.rtslab.energybox.properties.network.Network;
-import se.liu.rtslab.energybox.properties.network.Properties3G;
-import se.liu.rtslab.energybox.properties.network.PropertiesWifi;
-
 /**
  * @author Rihards Polis
  * Linkoping University
@@ -75,6 +70,7 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
     String sourceIP = "";
     HashMap<String, Integer> addressOccurrence = new HashMap();
     boolean error = false;
+    String os;
     
     final ObservableList<Packet> packetList = FXCollections.observableList(new ArrayList());
     @FXML
@@ -93,18 +89,16 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
     {
         // Load the icon for the Model button
         try {
-            image.setImage(new Image("img/gears.png", true));
+            image.setImage(new Image("/energybox/img/gears.png", true));
         } catch (Exception e) {
             System.err.println("Gears image not found");
         }
         
         // Checks between the two supported operating systems and tries to add
-        // the directory where the JAR file is located to the PATH or CLASSPATH
+        // the directory where the JAR file is locted to the PATH or CLASSPATH
         // variables in the JVM.
         // OS X uses tshark instead, so the process is different.
-/*
         os = OSTools.getOS();
-        System.out.println("MFC: "+os);
         switch(os)
         {
             case "Windows":
@@ -121,10 +115,9 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
                 {
                     OSTools.showErrorDialog("JVM path error!", e.getMessage());
                 }
-                System.out.println("MFC: "+relativePath.toString());
             }
             break;
-
+                
             case "Linux":
             {
                 String location = MainFormController.class.getProtectionDomain().getCodeSource().getLocation().getPath();
@@ -146,23 +139,24 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
                 }
             }
             break;
-
+            
             case "Mac":
             {
                 //The OS X version uses tshark as a temporary fix
                 //This code only checks whether tshark is installed and it can be executed,
-                //and shows an error otherwise.
+                //and shows an error otherwise. 
                 //Apache Commons Exec is used:
                  //Good tutorial http://blog.sanaulla.info/2010/09/07/execute-external-process-from-within-jvm-using-apache-commons-exec-library/
                 String answer = null;
                 final CommandLine cmdLine = new CommandLine("which");
                 cmdLine.addArgument("tshark");
-
+                
                 DefaultExecutor executor = new DefaultExecutor();
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 //Handle the output of the program
                 PumpStreamHandler streamHandler = new PumpStreamHandler(outputStream);
                 executor.setStreamHandler(streamHandler);
+                
                 try {
                     int exitValue = executor.execute(cmdLine,EnvironmentUtils.getProcEnvironment());
                     answer=outputStream.toString();
@@ -177,17 +171,16 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
                     //ToDo: Add a dialog "Tshark is not installed or in the path"
                     OSTools.showErrorDialog("MainFormController","Tshark is not installed or in the path");
                     //JOptionPane.showMessageDialog(null, "Tshark is not installed or in the path");
-                }
+                } 
                 //It does not work if its launched from NetBeans, launch from the terminal
-
+     
                 //http://commons.apache.org/proper/commons-exec/tutorial.html
                 //http://www.coderanch.com/t/624006/java/java/tshark-giving-output
            }
            break;
-
+                
         }
-*/
-
+        
         // Default 3G values for testing
         /*
         tracePath = "D:\\\\Source\\\\NetBeansProjects\\\\EnergyBox\\\\traces\\\\test1UL.pcap";
@@ -234,10 +227,15 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
         progressBar.visibleProperty().set(true);
         errorText.setText("Loading trace...");
         error = false;
-
         final UpdatesController controller = new ControllerUpdater(this);
-        final ProcessTrace trace = ProcessTrace.Factory.build(tracePath, controller,OSTools.getOS());
-        System.out.println("Running " + trace.getClass().getSimpleName());
+        final ProcessTrace trace;
+        if(os.equalsIgnoreCase("Mac")){
+            System.out.println("Running ProcessTraceOSX");
+            trace = new ProcessTraceOSX(tracePath, controller);
+        } else {
+            System.out.println("Running ProcessTraceLibpcap");
+            trace = new ProcessTraceLibpcap(tracePath, controller);
+        }
 
         // override ip. if "", will be calculated in ProcessTrace
         trace.setIp(ipField.getText());
@@ -299,7 +297,7 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
 
             case "Wifi":
             {
-                EngineWifi engine = new EngineWifi(packetList,
+                EngineWifi engine = new EngineWifi(packetList, 
                         sourceIP,
                         //networkProperties instanced as Properties3G
                         ((PropertiesWifi)networkProperties), 
@@ -321,6 +319,49 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
                 progressBar.setVisible(false);
                 errorText.setText("");
             }
+            break;
+            
+            case "LTE":
+            {
+                EngineLTE engine = new EngineLTE(packetList, 
+                        sourceIP,
+                        ((PropertiesLTE)networkProperties), 
+                        ((PropertiesDeviceLTE)deviceProperties));
+                engine.modelStates();
+                engine.calculatePower();
+                errorText.setText("Opening...");
+                progressBar.setProgress(0.99);
+                showResultsFormLTE(engine);
+                
+                modelButton.setDisable(false);
+                networkButton.setDisable(false);
+                deviceButton.setDisable(false);
+                traceButton.setDisable(false);
+                progressBar.setVisible(false);
+                errorText.setText("");
+            }    
+            break;
+            
+            case "LTE-tele2":
+            {
+                EngineLTE engine = new EngineLTE(packetList, 
+                        sourceIP,
+                        ((PropertiesLTE)networkProperties), 
+                        ((PropertiesDeviceLTE)deviceProperties));
+                engine.modelStates();
+                engine.calculatePower();
+                errorText.setText("Opening...");
+                progressBar.setProgress(0.99);
+                showResultsFormLTE(engine);
+                
+                modelButton.setDisable(false);
+                networkButton.setDisable(false);
+                deviceButton.setDisable(false);
+                traceButton.setDisable(false);
+                progressBar.setVisible(false);
+                errorText.setText("");
+            }    
+            break;    
         }
     }
     
@@ -330,7 +371,7 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
         Stage stage = new Stage();
         FileChooser fileChooser = new FileChooser();
         String path = OSTools.getJarLocation();
-        fileChooser.setInitialDirectory((new File(path)).getParentFile());
+        fileChooser.setInitialDirectory((new File(path)).getParentFile().getParentFile());
         fileChooser.setTitle("Open Device Configuration File");
         File file = fileChooser.showOpenDialog(stage);
         try
@@ -369,6 +410,18 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
                 }
                 break;
                     
+                case "DeviceLTE":
+                {
+                    String propError = validate(PropertiesDeviceLTE.class.getFields(), properties);
+                    if (!propError.equals(""))
+                    {
+                        OSTools.showErrorDialog("Config File Error!", propError);
+                        throw new NullPointerException();
+                    }    
+                    deviceProperties = new PropertiesDeviceLTE(properties);
+                }
+                break;
+                    
                 default:
                 {
                     OSTools.showErrorDialog("Config File Error!", "Not a valid config type");
@@ -388,7 +441,7 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
         Stage stage = new Stage();
         FileChooser fileChooser = new FileChooser();
         String path = OSTools.getJarLocation();
-        fileChooser.setInitialDirectory((new File(path)).getParentFile());
+        fileChooser.setInitialDirectory((new File(path)).getParentFile().getParentFile());
         fileChooser.setTitle("Open Network Configuration File");
         File file = fileChooser.showOpenDialog(stage);
         try
@@ -428,6 +481,30 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
                 }
                 break;
                     
+                case "LTE":
+                {
+                    String propError = validate(PropertiesLTE.class.getFields(), properties);
+                    if(!propError.equals(""))
+                    {
+                        OSTools.showErrorDialog("Config File Error!", propError);
+                        throw new NullPointerException();
+                    }    
+                    networkProperties = new PropertiesLTE(properties);
+                }
+                break;
+                
+                case "LTE-tele2":
+                {
+                    String propError = validate(PropertiesLTE.class.getFields(), properties);
+                    if(!propError.equals(""))
+                    {
+                        OSTools.showErrorDialog("Config File Error!", propError);
+                        throw new NullPointerException();
+                    }    
+                    networkProperties = new PropertiesLTE(properties);
+                }
+                break;
+                    
                 default:
                 {
                     OSTools.showErrorDialog("Config File Error!", "Not a valid config type");
@@ -448,7 +525,7 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
         Stage stage = new Stage();
         FileChooser fileChooser = new FileChooser();
         String path = OSTools.getJarLocation();
-        fileChooser.setInitialDirectory((new File(path)).getParentFile());
+        fileChooser.setInitialDirectory((new File(path)).getParentFile().getParentFile());
         fileChooser.setTitle("Open Network Configuration File");
         try
         {
@@ -466,11 +543,11 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
         try
         {
             // Creates stage from loader which gets the scene from the fxml file
-            FXMLLoader loader = new FXMLLoader(getClass().getClassLoader().getResource("ResultsForm3G.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("ResultsForm3G.fxml"));
             Stage stage = new Stage();
             stage.setScene(new Scene((Parent)loader.load()));
             stage.setTitle(textField.getText());
-            stage.getIcons().add(new Image("img/icon.png"));
+            stage.getIcons().add(new Image("/energybox/img/icon.png"));
 
             // Calls a method on the controller to initialize it with the required data values
             ResultsForm3GController controller = 
@@ -489,11 +566,11 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
         try
         {
             // Creates stage from loader which gets the scene from the fxml file
-            FXMLLoader loader = new FXMLLoader(getClass().getClassLoader().getResource("ResultsFormWifi.fxml"));
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("ResultsFormWifi.fxml"));
             Stage stage = new Stage();
             stage.setScene(new Scene((Parent)loader.load()));
             stage.setTitle(textField.getText());
-            stage.getIcons().add(new Image("img/icon.png"));
+            stage.getIcons().add(new Image("/energybox/img/icon.png"));
 
             // Calls a method on the controller to initialize it with the required data values
             ResultsFormWifiController controller = 
@@ -506,7 +583,29 @@ public class MainFormController implements Initializable, Runnable, ProgressObse
         return null;
     }
 
-    // Deprecated! Only used for testing
+        public Stage showResultsFormLTE(EngineLTE engine) 
+    {
+        try
+        {
+            // Creates stage from loader which gets the scene from the fxml file
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("ResultsFormLTE.fxml"));
+            Stage stage = new Stage();
+            stage.setScene(new Scene((Parent)loader.load()));
+            stage.setTitle(textField.getText());
+            stage.getIcons().add(new Image("/energybox/img/icon.png"));
+
+            // Calls a method on the controller to initialize it with the required data values
+            ResultsFormLTEController controller = 
+            loader.<ResultsFormLTEController>getController();
+            controller.initData(engine);
+            stage.show();
+            return stage;
+        }
+        catch (IOException e){ e.printStackTrace(); }
+        return null;
+    }
+        
+    // Depricated! Only used for testing    
     public Properties pathToProperties(String path)
     {
         Properties properties = new Properties();

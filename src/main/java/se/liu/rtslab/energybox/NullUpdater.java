@@ -1,4 +1,4 @@
-package se.liu.rtslab.energybox;
+package energybox;
 
 public final class NullUpdater implements UpdatesController {
 

@@ -1,6 +1,7 @@
-package se.liu.rtslab.energybox;
+package energybox;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.BufferUnderflowException;
@@ -8,7 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import org.jnetpcap.Pcap;
@@ -64,7 +65,7 @@ public class ProcessTraceLibpcap implements ProcessTrace
 
         // Get size of trace for progress display.
         totalBytes = (new File(tracePath)).length();
-        // Check wether the .dll file can be found
+        // Check weather the .dll file can be found
         try { pcap = Pcap.openOffline(tracePath, errbuf); }
         catch(UnsatisfiedLinkError e)
         {
